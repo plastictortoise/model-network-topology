@@ -1,6 +1,6 @@
 from sys import argv
 from devices import Host, Router, Topology
-from config import IP_ADDRESSES, MAC_ADDRESSES, ROUTING_TABLE
+from config import IP_ADDRESSES, MAC_ADDRESSES, ROUTING_TABLE, ROUTER_INTERFACES
 
 if __name__ == "__main__":
     # Ensure that the program only runs with one argument
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     router = Router(
         name="Router R1",
-        interfaces=[1, 2],
+        interfaces=ROUTER_INTERFACES,
         routing_table=ROUTING_TABLE["Router R1"]
     )
 

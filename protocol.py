@@ -1,9 +1,5 @@
 import struct
-from config import ARP_TABLE, MAX_SEGMENT_PAYLOAD
-
-
-def is_router(device):
-    return hasattr(device, "interfaces")
+from config import ARP_TABLE, MAX_SEGMENT_PAYLOAD, is_router
 
 
 """
@@ -64,27 +60,50 @@ class DataLinkLayer(Layer):
         self.device = device
 
     def encapsulate(self, packet: bytes, destination_mac: str):
+        if is_router(self.device):
+            device_mac = self.device.get_mac(self.device.current_interface)
+        else:
+            device_mac = self.device.mac
+
         destination_mac = bytes.fromhex(destination_mac.replace(":", ""))
-        mac = bytes.fromhex(self.device.mac.replace(":", ""))
+        mac = bytes.fromhex(device_mac.replace(":", ""))
         frame = struct.pack("!6s6sH", destination_mac, mac, 0x0800) + packet
         return frame
 
     def decapsulate(self, frame: Frame):
         return frame.payload
 
-    def send(self, segment: bytes, destination_mac: str, interface: (int|None) = None):
+    def send(self, segment: bytes, destination_ip: str, interface: (int|None) = None):
+        if is_router(self.device):
+            device_mac = self.device.get_mac(self.device.current_interface)
+        else:
+            device_mac = self.device.mac
+
         self.log("Packet received from Network Layer")
+        destination_mac = ARP_TABLE[destination_ip]
+        self.log(f"Destination MAC lookup for next-hop IP ({destination_ip}) -> {destination_mac}")
         frame = self.encapsulate(segment, destination_mac)
-        self.device.topology.get_device(destination_mac).data_link_layer.receive(frame, interface)
+        self.log(f"Frame created: SRC_MAC={device_mac}, DST_MAC={destination_mac}")
+        self.log(f"Frame sent")
+        device, interface = self.device.topology.get_device(destination_mac)
+        device.data_link_layer.receive(frame, interface)
 
     def receive(self, frame_bytes: bytes, interface: (int|None) = None):
         frame = Frame(frame_bytes)
         packet_bytes = self.decapsulate(frame)
 
+        source_mac = frame.source_mac.hex()
+
         if interface is not None:
-            packet_bytes = self.device.get_interface(interface).network_layer.receive(packet_bytes)
+            self.log(f"Frame received on Interface {interface}")
+            self.log(f"Source MAC learned: {source_mac} on Interface {interface}")
+            self.device.current_interface = interface
         else:
-            packet_bytes = self.device.network_layer.receive(packet_bytes)
+            self.log(f"Frame received")
+            self.log(f"Source MAC learned: {source_mac}")
+        
+        self.log(f"Packet delivered to Network Layer")
+        self.device.network_layer.receive(packet_bytes)
 
 
 """
@@ -96,7 +115,12 @@ class NetworkLayer(Layer):
         self.device = device
 
     def encapsulate(self, segment: bytes, ttl: int, destination_ip: str):
-        ip = bytes(int(i) for i in self.device.ip.split("."))
+        if is_router(self.device):
+            device_ip = self.device.get_ip(self.device.current_interface)
+        else:
+            device_ip = self.device.ip
+        
+        ip = bytes(int(i) for i in device_ip.split("."))
         destination_ip = bytes(int(i) for i in destination_ip.split("."))
         packet = struct.pack('!4s4sBBH', ip, destination_ip, ttl, 17, 12 + len(segment)) + segment
         return packet
@@ -117,19 +141,50 @@ class NetworkLayer(Layer):
         if is_router(self.device):
             out_interface = self.device.select_out_interface(next_hop)
             self.log(f"Outgoing interface selected (Interface {out_interface})")
+            self.device.current_interface = out_interface
         else:
             self.log("Outgoing interface selected")
 
 
         packet = self.encapsulate(segment, ttl, destination_ip)
-        destination_mac = ARP_TABLE[destination_ip]
         self.log(f"Packet forwarded to Data Link Layer")
-        self.device.data_link_layer.send(packet, destination_mac)
+        self.device.data_link_layer.send(packet, next_hop)
 
     def receive(self, packet_bytes: bytes):
         packet = Packet(packet_bytes)
-        segment_bytes = self.decapsulate(packet)
-        self.device.transport_layer.receive(segment_bytes)
+
+        if is_router(self.device):
+            destination_ip = ".".join(str(b) for b in packet.destination_ip)
+            source_ip = ".".join(str(b) for b in packet.source_ip)
+            destination_ip = ".".join(str(b) for b in packet.destination_ip)
+            self.log(f"Packet received from Data Link Layer: SRC_IP={source_ip}, DST_IP={destination_ip}, TTL={packet.ttl}")
+            self.log(f"Destination IP read: {destination_ip}")
+
+            ttl = packet.ttl
+            if ttl <= 0:
+                return
+
+            ttl -= 1
+
+            self.log(f"TTL decremented: {ttl + 1} -> {ttl}")
+
+            if destination_ip in self.device.routing_table:
+                next_hop = self.device.routing_table[destination_ip]
+            
+            next_hop = self.device.routing_table[destination_ip]
+            self.log("Routing table lookup performed")
+            self.log(f"Next-hop IP determined: {next_hop}")
+
+            out_interface = self.device.select_out_interface(next_hop)
+            self.log(f"Outgoing interface selected (Interface {out_interface})")
+
+            packet = self.encapsulate(packet_bytes, ttl, destination_ip)
+            
+            self.log("Packet forwarded to Data Link Layer")
+            self.device.data_link_layer.send(packet_bytes, next_hop)
+        else:
+            segment_bytes = self.decapsulate(packet)
+            self.device.transport_layer.receive(segment_bytes)
 
 
 """
@@ -146,6 +201,7 @@ class TransportLayer(Layer):
         chunks = [data[i:i+MAX_SEGMENT_PAYLOAD] for i in range(0, len(data), MAX_SEGMENT_PAYLOAD)]
         for chunk in chunks:
             segment = self.encapsulate(chunk, destination_port)
+            self.log(f"Segment sent to Network Layer")
             self.device.network_layer.send(segment, destination_ip)
 
             self.awaiting_ack = True

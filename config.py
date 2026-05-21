@@ -1,3 +1,6 @@
+def is_router(device):
+    return hasattr(device, "interfaces")
+
 IP_ADDRESSES = {
     "Host A": "10.0.1.10",
     "Host B": "10.0.2.20"
@@ -15,8 +18,8 @@ MAC_ADDRESSES = {
 
 ARP_TABLE = {
     "10.0.1.10": "AA:AA:AA:AA:AA:AA",
-    "10.0.2.20": "BB:BB:BB:BB:BB:BB",
-    "10.0.1.1": "CC:CC:CC:CC:CC:CC",
+    "10.0.1.1": "BB:BB:BB:BB:BB:BB",
+    "10.0.2.1": "CC:CC:CC:CC:CC:CC",
     "10.0.2.20": "DD:DD:DD:DD:DD:DD"
 }
 
@@ -34,7 +37,7 @@ ROUTING_TABLE = {
     },
     "Host B": {
         "10.0.2.20": "10.0.2.20",
-        "10.0.1.10": "10.0.2.20"
+        "10.0.1.10": "10.0.2.1"
     },
     "Router R1": {
         "10.0.1.1": "10.0.1.1",
@@ -42,11 +45,11 @@ ROUTING_TABLE = {
     }
 }
 
-TOPOLOGY_LINKS = {
-    ("Host A", None): ("Router R1", 1),
-    ("Host B", None): ("Router R1", 2),
-    ("Router R1", 1): ("Host A", None),
-    ("Router R1", 2): ("Host B", None)
+NEXT_HOP_INTERFACE = {
+    "10.0.1.10": 1,
+    "10.0.2.20": 2,
+    "10.0.1.1": 1,
+    "10.0.2.1": 2
 }
 
 MAX_SEGMENT_PAYLOAD = 500

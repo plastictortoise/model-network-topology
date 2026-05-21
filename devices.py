@@ -1,4 +1,4 @@
-from config import MAC_ADDRESSES, TOPOLOGY_LINKS
+from config import MAC_ADDRESSES, NEXT_HOP_INTERFACE, is_router
 from protocol import DataLinkLayer, NetworkLayer, TransportLayer
 
 """
@@ -13,17 +13,16 @@ class Topology:
 
     def get_device(self, mac_address: str):
         for device in self.devices:
-            if MAC_ADDRESSES[device.name] == mac_address:
-                return device
+            if is_router(device):
+                for interface in device.interfaces.keys():
+                    if device.interfaces[interface]["mac"] == mac_address:
+                        return (device, interface)
+            else:
+                if MAC_ADDRESSES[device.name] == mac_address:
+                    return (device, None)
         
-        return None
+        return (None, None)
 
-    def transmit(self, frame: bytes, sender: str, interface: (int|None) = None):
-        for link in TOPOLOGY_LINKS:
-            if link[0] == sender:
-                if link[1] == interface:
-                    self.devices[link[2]].data_link_layer.receive(frame)
-                    return
 
 """
 Device: defines the base class for all devices
@@ -83,6 +82,9 @@ class Router(Device):
 
     def get_interface(self, interface: int):
         return self.interfaces[interface]
+
+    def select_out_interface(self, next_hop: str):
+        return NEXT_HOP_INTERFACE[next_hop]
 
     def get_ip(self, interface: int):
         return self.interfaces[interface]["ip"]
