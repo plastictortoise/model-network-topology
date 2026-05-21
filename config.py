@@ -3,11 +3,14 @@ IP_ADDRESSES = {
     "Host B": "10.0.2.20"
 }
 
+ROUTER_INTERFACES = {
+    1: {"ip": "10.0.1.1", "mac": "BB:BB:BB:BB:BB:BB"},
+    2: {"ip": "10.0.2.1", "mac": "CC:CC:CC:CC:CC:CC"},
+}
+
 MAC_ADDRESSES = {
     "Host A": "AA:AA:AA:AA:AA:AA",
-    "Host B": "BB:BB:BB:BB:BB:BB",
-    "Router R1": "CC:CC:CC:CC:CC:CC",
-    "Router R2": "DD:DD:DD:DD:DD:DD"
+    "Host B": "DD:DD:DD:DD:DD:DD"
 }
 
 ARP_TABLE = {
@@ -43,5 +46,9 @@ TOPOLOGY_LINKS = {
     ("Host A", None): ("Router R1", 1),
     ("Host B", None): ("Router R1", 2),
     ("Router R1", 1): ("Host A", None),
-    ("Router R1", 2): ("Host B", None),
+    ("Router R1", 2): ("Host B", None)
 }
+
+MAX_SEGMENT_PAYLOAD = 500
+DATA_SEGMENT = 0
+ACK_SEGMENT = 1

@@ -4,7 +4,6 @@ from protocol import DataLinkLayer, NetworkLayer, TransportLayer
 """
 Topology: defines the topology of the network and enables the transmission of frames between devices.
 """
-
 class Topology:
     def __init__(self):
         self.devices = []
@@ -55,6 +54,9 @@ class Host(Device):
         self.network_layer = NetworkLayer(self)
         self.transport_layer = TransportLayer(self)
 
+    def receive(self, frame: bytes):
+        self.data_link_layer.receive(frame)
+
 
 """
 Router: defines the router device with two interfaces. Contains all the layers for the router. Based on the Device class.
@@ -65,8 +67,25 @@ class Router(Device):
         super().__init__(name)
         self.interfaces = interfaces
         self.routing_table = routing_table
+        self.current_interface = None
 
         # Layers
         self.data_link_layer = DataLinkLayer(self)
         self.network_layer = NetworkLayer(self)
-        self.transport_layer = TransportLayer(self)
+
+    def recieve(self, frame: bytes, interface: int):
+        self.current_interface = interface
+        self.data_link_layer.receive(frame, interface)
+
+    def send(self, frame: bytes, interface: int):
+        self.current_interface = interface
+        self.data_link_layer.send(frame)
+
+    def get_interface(self, interface: int):
+        return self.interfaces[interface]
+
+    def get_ip(self, interface: int):
+        return self.interfaces[interface]["ip"]
+
+    def get_mac(self, interface: int):
+        return self.interfaces[interface]["mac"]
